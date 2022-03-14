@@ -1,4 +1,4 @@
-function h = mkBow(d,xl,varargin)
+function h = mkBow(d,xl,groupColor)
     if nargin<2 || isempty(xl)
         xl = 1:length(d(1,:));
     end
@@ -33,7 +33,9 @@ function h = mkBow(d,xl,varargin)
     
     w = 0.6;
     wpg = w./groups;
-    groupColor = [1 0.6 0.2; 0.2 0.6 1];
+    if nargin < 3 || isempty(groupColor)
+        groupColor = [1 0.6 0.2; 0.2 0.6 1];
+    end
     dip = 0.025;
 
     for i = 1:groups

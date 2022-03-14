@@ -5,7 +5,7 @@ function h = plotTernary(d,val,colors,labels,doBackground)
     end
 
     if nargin < 2 || isempty(val)
-        val = ones(length(d(:,1))).*20; 
+        val = ones(length(d(:,1)),1).*20; 
     end
     
     if nargin < 3 || isempty(colors)
@@ -23,16 +23,16 @@ function h = plotTernary(d,val,colors,labels,doBackground)
     hold on
     
     if doBackground
-        patch(sind(bangs([1:end 1])),cosd(bangs([1:end 1])),[0.5 0.5 0.5])
+        patch(sind(bangs([1:end 1])),cosd(bangs([1:end 1])),[0.75 0.75 0.75])
         plot(sind(bangs([1:end 1])),cosd(bangs([1:end 1])),...
-            'color',[0.75 0.75 0.75],...
+            'color',[1 1 1],...
             'linestyle','-','linewidth',1.5)
         for i = [0.25:0.25:0.75]
-            plot(i.*sind(bangs([1:end 1])),i.*cosd(bangs([1:end 1])),'color',[0.75 0.75 0.75],...
+            plot(i.*sind(bangs([1:end 1])),i.*cosd(bangs([1:end 1])),'color',[1 1 1],...
             'linestyle',':','linewidth',1)
         end
         plot([zeros(1,length(angs)); sind(angs)],[zeros(1,length(angs)); cosd(angs)], ...
-            'color',[0.75 0.75 0.75],...
+            'color',[1 1 1],...
             'linestyle',':','linewidth',1)
     end
     

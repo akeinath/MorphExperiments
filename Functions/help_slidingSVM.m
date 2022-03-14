@@ -14,7 +14,7 @@ function [predAcc linAcc] = help_slidingSVM(allVecs,group)
     day(exclude) = [];
     
     tic
-    windowSize = 18;
+    windowSize = 12;
     predAcc = nan(nanmax(day)-windowSize+1,nanmax(day));
     for train = 1:nanmax(day)-windowSize+1
         

@@ -8,7 +8,7 @@ function [sfit sintercept lfit mad max_sep] = fitSigLin(data)
     lparams = nan(length(data(:,1)),2);
     x = 1:length(data(1,:));
     for i = 1:length(data(:,1))
-        d = cellfun(@nanmedian,data(i,:));
+        d = cellfun(@nanmean,data(i,:));
         
         % Sigmoidal fit and plot
         
@@ -17,12 +17,12 @@ function [sfit sintercept lfit mad max_sep] = fitSigLin(data)
         sfit(i,:) = [fval params];
 %         sfit(2,i) = params(1);
         
-        hold on
-        if i == 1
-            plot(fliplr(x),tanh(doSig(x,params)),'color','r','linestyle',':');
-        else
-            plot(x,tanh(doSig(x,params)),'color','b','linestyle',':');
-        end
+%         hold on
+%         if i == 1
+%             plot(fliplr(x),tanh(doSig(x,params)),'color','r','linestyle',':');
+%         else
+%             plot(x,tanh(doSig(x,params)),'color','b','linestyle',':');
+%         end
         
         % Linear fit and plot
         params = polyfit(x,d,1);

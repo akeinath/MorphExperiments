@@ -7,7 +7,7 @@ function saveFig(h,p,form)
     checkP(p);
     
     ax = findall(h,'type','axes');
-    set(ax,'fontname','arial','fontweight','normal','fontsize',9);
+    set(ax,'fontname','arial','fontweight','normal','fontsize',11);
     drawnow;
     
     checkP(p);

@@ -3,7 +3,7 @@ function rgb = v2rgb(vals,crange)
         crange = [min(vals) max(vals)];
     end
     % Generate the colormap
-    cmap = parula(256);
+    cmap = inferno(256);
     % Normalize the values to be between 1 and 256
     vals(vals < crange(1)) = crange(1);
     vals(vals > crange(2)) = crange(2);

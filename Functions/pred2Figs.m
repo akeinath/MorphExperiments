@@ -1,5 +1,6 @@
 function pred2Figs()
-    paths = getFilePaths('MatlabData/Model_Grouped_SVMs_6Days','.mat');
+    
+    paths = getFilePaths('MatlabData/Model_Grouped_SVMs_12Days','.mat');
 
     allSel = [];
     allAcc = [];
@@ -11,7 +12,7 @@ function pred2Figs()
         load(p{1},'tr2','linAcc','r2penalty');
         [sr2 best] = sort(r2penalty,2,'descend');
         isAttractor = best(:,1)==2;
-        selectivity = [sr2(:,1) - nanmean(sr2(:,2:3),2)].*tr2(:,1);
+        selectivity = [nanmean(sr2(:,1),2) - nanmean(sr2(:,2:3),2)].*tr2;
 %         selectivity = [r2penalty(:,2)-r2penalty(:,1)];
         
 %         close all
@@ -62,31 +63,34 @@ function pred2Figs()
 %     h2 = patch([train(1) train(end) train(end) train(1)],[0 0 1 1],[0.5 0.5 0.5],...
 %         'facecolor',[0.5 0.5 0.5],'edgecolor','none');
     plot(get(gca,'xlim'),[0.5 0.5],'color','k','linestyle','--')
-    legend(h,[{'Lower selectivity'} {'Higher selectivity'}],'location','southeast')    
+    legend(h,[{'Lower selectivity'} {'Higher selectivity'}],'location','northeast')    
     pvals = nan(1,length(x));
     for k = 1:length(x)
         [a b c] = ranksum(low(:,k),high(:,k));
         pvals(k) = a;
     end
-    text(x(pvals<0.05),0.9.*ones(1,nansum(pvals<0.05)),'*','fontname','arial', ...
-        'fontweight','normal','fontsize',9,'horizontalalignment','center')
+%     text(x(pvals<0.05),0.9.*ones(1,nansum(pvals<0.05)),'*','fontname','arial', ...
+%         'fontweight','normal','fontsize',9,'horizontalalignment','center')
     xlabel('Day')
     ylabel('Prediction accuracy (%)')
-    set(gca,'ytick',[0:0.25:1],'yticklabels',[0:25:100])
+    set(gca,'ylim',[0.4 1],'ytick',[0:0.25:1],'yticklabels',[0:25:100])
     drawnow
     outP = ['Plots/Model/Summary/SlidingWindowDecoding_6Days'];
     saveFig(gcf,outP,[{'tiff'} {'pdf'}])
     
     figure()
     set(gcf,'position',[50 50 200 250])
-    h = mkBow([{allSel(1:80)} {allSel(81:end)}],[{'Lower'} {'Higher'}]);
+    h = mkBow([{allSel(1:80,:)} {allSel(81:end,:)}],[{'Lower'} {'Higher'}]);
     xlabel('Model group')
     ylabel('Selecitivity index')
     outP = ['Plots/Model/Summary/Grouped_SelectivityDiff'];
     saveFig(gcf,outP,[{'tiff'} {'pdf'}])
     
+    
+    
+    doCoef = ~isnan(allCoef(:,1)) & all(abs(allCoef(:,1))<1,2) & all((allCoef(:,1))>0,2);
     endColors = [1 0.6 0.2; 0.2 0.6 1];
-    rSel = [allSel-nanmin(allSel)]./[nanmax(allSel)-nanmin(allSel)];
+    rSel = [allSel-nanmin(allSel(doCoef))]./[nanmax(allSel(doCoef))-nanmin(allSel(doCoef))];
     rSel = ((rSel-0.5).*1.5)+0.5;
     rSel(rSel<0) = 0;
     rSel(rSel>1) = 1;
@@ -94,7 +98,6 @@ function pred2Figs()
 
     figure
     set(gcf,'position',[50 50 900 250]);
-    doCoef = ~isnan(allCoef(:,1));
     for i = 1:3
         subplot(1,3,i)
         scatter(allSel(doCoef),allCoef(doCoef,i),15,doColor(doCoef,:), ...

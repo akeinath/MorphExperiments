@@ -6,7 +6,7 @@ function alignNwiseSessions(paths,nFold)
     warning ('off','all');
     
     
-    iters = 5;
+    iters = 1;
     
     clc
     fprintf('\n')
@@ -43,12 +43,14 @@ function alignNwiseSessions(paths,nFold)
 %         combs(end-nFold+2:end,:) = [];
 %         combs = combs(:,1:nFold);
        
+        meanFrames = repmat({[]},[1 length(sessions)]);
         allPrepped = repmat({[]},[1 length(sessions)]);
         for si = 1:length(sessions)
             fprintf(['\t\tSession:  ' sessions{si}(find(ismember(sessions{si},'/'),1,'last')+1:end) '\n'])
-            ref = load(sessions{si},'calcium','processed');       
+            ref = load(sessions{si},'calcium','processed');  
+            meanFrames{si} = ref.processed.meanFrame;
             prepped = ref.calcium.SFPs .* ...
-                    bsxfun(@gt,ref.calcium.SFPs,0.5.*nanmax(nanmax(ref.calcium.SFPs,[],1),[],2));
+                    bsxfun(@gt,ref.calcium.SFPs,0.5.*nanmax(nanmax(ref.calcium.SFPs,[],1),[],2)); % originally 0.5
 %             prepped = ref.calcium.SFPs.^(2);
             allPrepped{si} = permute(prepped,[3 1 2]); %msExtractSFPs(ref.calcium);
             if isfield(ref.processed,'exclude')
@@ -70,31 +72,56 @@ function alignNwiseSessions(paths,nFold)
             end
         end
         
+        tmp = cellfun(@size,meanFrames,'uniformoutput',false);
+        tmp = cat(1,tmp{:});
+        matchSize = nanmax(tmp);
+        for i = 1:length(meanFrames)
+            while length(meanFrames{i}(1,:)) < matchSize(2)
+                meanFrames{i} = cat(2,meanFrames{i},zeros(length(meanFrames{i}(:,1)),1));
+                tmp = allPrepped{i};
+                tmp = permute(tmp,[2 3 1]);
+                tmp = cat(2,tmp,zeros(length(tmp(:,1,1)),1,length(tmp(1,1,:))));
+                allPrepped{i} = permute(tmp,[3 1 2]);
+            end
+            
+            while length(meanFrames{i}(:,1)) < matchSize(1)
+                meanFrames{i} = cat(1,meanFrames{i},zeros(1,length(meanFrames{i}(1,:))));
+                tmp = allPrepped{i};
+                tmp = permute(tmp,[2 3 1]);
+                tmp = cat(1,tmp,zeros(1,length(tmp(1,:,1)),length(tmp(1,1,:))));
+                allPrepped{i} = permute(tmp,[3 1 2]);
+            end
+        end
+        
+%         allPrepped = normcorredFrameShifts(meanFrames,allPrepped);
+        
+        % simple supervised roi-based mean frame alignment, heirarchical
+        % for speed
+        
+        out.SFPs = allPrepped;
+        out.meanFrames = meanFrames;
+        save('forMohommad','-struct','out','-v7.3');
+        
+        prePrep = allPrepped;
+        allPrepped = supervisedFrameShifts_simple(meanFrames,prePrep);
+        
+        
         mspiece = spiece(isM);
         alignmentMap = repmat({[]},[length(combs(:,1)) 1]);
         for i = 1:length(combs(:,1))
             
-%             if nFold==2 
-%                 if ~isempty(oldAlignmentMap{combs(i,1),combs(i,2)})
-%                     continue
-%                 end
-%             else
-%                 if ~isempty(oldAlignmentMap{i})
-%                     continue
-%                 end
-%             end
-            
             itermap = repmat({[]},[1 iters]);
-            for si = combs(i,:)              
-                prepped = allPrepped{si};
-                outP = ['SegmentsForAlignment/' mspiece{si}];% num2str(find(si == combs(i,:)))];
-                checkP(outP)
-                save(outP,'prepped'); 
-            end
+%             for si = combs(i,:)              
+%                 prepped = allPrepped{si};
+%                 outP = ['SegmentsForAlignment/' mspiece{si}];% num2str(find(si == combs(i,:)))];
+%                 checkP(outP)
+%                 save(outP,'prepped'); 
+%             end
+            clear ref
 
             for iteration = 1:iters
                 try
-                    [map regStruct] = registerCells(['SegmentsForAlignment']);
+                    [map regStruct] = registerCells(allPrepped); %meanFrames(combs(i,:))
                 catch
                     map = [];
                 end
@@ -103,7 +130,7 @@ function alignNwiseSessions(paths,nFold)
                 close all hidden
                 drawnow
             end
-            rmdir(['SegmentsForAlignment'],'s');
+%             rmdir(['SegmentsForAlignment'],'s');
             
             itermap = itermap(~cellfun(@isempty,itermap));
             
@@ -153,6 +180,7 @@ function alignNwiseSessions(paths,nFold)
         ref.alignment(doInd).sessions = sessions;
         ref.alignment(doInd).nFold = nFold;
         if nFold == length(sessions)
+            ref.alignment(doInd).aam = itermap;
             ref.alignment(doInd).regDetails = regStruct;
         end
         save(sessions{1},'-struct','ref','-v7.3');

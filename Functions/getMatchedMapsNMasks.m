@@ -7,7 +7,7 @@ function [m os val ival] = getMatchedMapsNMasks(p,ts,masks)
     
     os = min(s,[],3);
     
-    nsim = 100;
+    nsim = 1;
     if all(os(:)==0)
         val = nan;
     	return
@@ -38,8 +38,11 @@ function [m os val ival] = getMatchedMapsNMasks(p,ts,masks)
                     b = reshape(mb(:,:,k,:),[numel(ma(:,:,1,1)) nsim]);
                     a(isnan(a(:,1)),:) = [];
                     b(isnan(b(:,1)),:) = [];
-                    tmp = corr(a,b);
-                    ival(ki,kj,k) = nanmean(tmp(logical(eye(length(tmp)))));
+                    
+                    try
+                        tmp = corr(a,b);
+                        ival(ki,kj,k) = nanmean(tmp(logical(eye(length(tmp)))));
+                    end
                 end
             end
         end

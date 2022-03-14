@@ -5,43 +5,31 @@ function model_contAnalysis(doShuffle)
     %%%%%%%%%%%%%%% prep params
 
 %     popSize = [400 25 150].*3;
-    popSize = [300 25 150].*1;
+    popSize = [300 25 150].*4;
     ca1Div = [30 30 30].*3;
     
     if ~doShuffle
-        invout = [15 10]; %75 25
+        invout = [15 5]; %75 25
     else
-        invout = [15 150];
+        invout = [5 15];
     end
     
-    numDays = 96;
+    numDays = 64;
     maxActive = 0.25;
     envLabels = [{'sq1'} {'g1'} {'g2'} {'g3'} {'sq2'} {'sq3'}];
     envs = [];
     
-    root = ['Plots/Model/'];
+    fnum = [0];
     if doShuffle
-        root = [root 'Shuffled_'];
+        tmp = getFilePaths(['MatlabData/Model/Selectivity/Low/'],'mat');
+    else
+        tmp = getFilePaths(['MatlabData/Model/Selectivity/High/'],'mat');
     end
-    fnum = [30];
-    tmp = getFilePaths('MatlabData/Model','mat');
     for i = length(tmp):-1:1
         name = tmp{i}(find(ismember(tmp{i},'/'),1,'last')+1:end-4);
-        if doShuffle
-            if ~all(name(1:7)=='shuffle')
-                tmp(i) = [];
-                continue
-            end
-        else
-            if all(name(1:7)=='shuffle')
-                tmp(i) = [];
-                continue
-            end
-        end
         fnum = [fnum; str2num(name(find(ismember(name,'_'),1,'last')+1:end))];
     end
     fnum = nanmax(fnum)+1;
-    root = [root num2str(fnum)];
     
     fprintf(['\n\t\t\tSim: ' num2str(fnum) '\tLow Selectivity: ' num2str(doShuffle) '\n'])
     
@@ -112,7 +100,7 @@ function model_contAnalysis(doShuffle)
         
         cam(:,:,:,si) = am;
         
-        fl = fl + randi(5,popSize(1),2)-3;
+        fl = fl + randi(9,popSize(1),2)-5;
         fl(fl<1) = 1;
         fl(fl(:,1)>envSize(1),1) = envSize(1);
         fl(fl(:,2)>envSize(2),2) = envSize(2);
@@ -253,11 +241,11 @@ function model_contAnalysis(doShuffle)
     
     % save data
     if doShuffle
-        checkP(['MatlabData/Model/shuffle_simulation_data_' num2str(fnum)]);
-        save(['MatlabData/Model/shuffle_simulation_data_' num2str(fnum)]);
+        checkP(['MatlabData/Model/Selectivity/Low/simulation_data_' num2str(fnum)]);
+        save(['MatlabData/Model/Selectivity/Low/simulation_data_' num2str(fnum)]);
     else
-        checkP(['MatlabData/Model/simulation_data_' num2str(fnum)]);
-        save(['MatlabData/Model/simulation_data_' num2str(fnum)]);
+        checkP(['MatlabData/Model/Selectivity/High/simulation_data_' num2str(fnum)]);
+        save(['MatlabData/Model/Selectivity/High/simulation_data_' num2str(fnum)]);
     end
     
 %     %%%%%%%%%%%%%%%%%% REPLICATE ANALYSIS

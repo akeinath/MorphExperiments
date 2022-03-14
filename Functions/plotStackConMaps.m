@@ -2,10 +2,10 @@ function plotStackConMaps(m,envs,order)
 
     seq = floor(length(m(1,1,:))./6);
     figure
-    set(gcf,'position',[50 50 8.*150 seq.*150])
+    set(gcf,'position',[50 50 6.*150 seq.*150])
     for i = 1:seq
         
-        doI = (i-1).*6+1:nanmin((i-1).*6+8,length(m(1,1,:)));
+        doI = (i-1).*6+1:nanmin((i-1).*6+6,length(m(1,1,:)));
         if nargin < 3 || isempty(order)
             sI = doI;
         else
@@ -24,8 +24,9 @@ function plotStackConMaps(m,envs,order)
         end
         subplot(seq,1,i)
         imagesc(tcm)
-        colormap jet
+        colormap parula
         alpha(double(~isnan(tcm)))
+        axis equal
         axis off
     end
 end

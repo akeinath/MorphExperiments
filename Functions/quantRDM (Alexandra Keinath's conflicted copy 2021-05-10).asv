@@ -1,0 +1,186 @@
+function quantRDM(across,root)
+
+    conStack = [];
+    for i = 1:5
+        conStack = cat(3,conStack,permute(across.RDMs(:,:,i,i,:),[1 2 3 5 4]));
+    end
+    nConComps = permute(nansum(nansum(~isnan(conStack),1),2),[4 3 1 2]);
+    isFullCon = nConComps==nanmax(nConComps(:));
+    [x y] = ind2sub(size(nConComps),find(isFullCon));
+    
+    doV = nan(6,6,length(x));
+    for k = 1:length(x)
+        doV(:,:,k) = across.RDMs(:,:,y(k),y(k),x(k));
+    end
+    
+%     tic
+%     [contextParams contextError] = fitContextPattern(doV,1);
+%     toc
+%     
+%     save('IndividualContextFits','contextParams','contextError');
+    load('IndividualContextFits.mat');
+    
+
+    tic
+    [out linMAE] = help_predCellDOL(doV,[0:3]);
+    toc
+    
+    sVals = doV;
+    for k = 1:length(doV(1,1,:))
+        o = randperm(length(doV(:,1,1)));
+        tmp = squarify(doV(o,o,k));
+        tmp(isnan(doV(:,:,1))) = nan;
+        sVals(:,:,k) = tmp;
+    end
+    
+    tic
+    [out slinMAE] = help_predCellDOL(sVals,[0:3]);
+    toc
+    
+    tic
+    [shuffle_params shuffleError] = fitContextPattern(sVals,1);
+    toc
+    
+    
+    conMAE = nan(size(nConComps));
+    for k = 1:length(x)
+        conMAE(x(k),y(k)) = contextError(k);
+    end
+    
+    errorThreshold = inf;
+    clusteredContext = clustParams(contextParams(contextError<errorThreshold,:),[],'mahalanobis');
+    plotClustProps(clusteredContext,doV(:,:,contextError<errorThreshold),[root '/Clustering_Stability/']);   
+    getEmbeddingExamples(clusteredContext,doV(:,:,contextError<errorThreshold),[root '/Clustering_Stability/']);
+    
+    save('Clustered_Context','clusteredContext');
+    
+    load('Clustered_Context.mat')
+    plotClustProps(clusteredContext,doV,[root '/Clustering_Stability/']);
+
+    figure(1)
+    set(gcf,'position',[50 50 1200 600])
+    for i = 1:5
+        subplot(2,3,i)
+        doColors = v2rgb(contextParams(:,i));
+        scatter(clusteredContext.embedding(:,1), ...
+            clusteredContext.embedding(:,2),10,doColors,'filled');
+        axis equal
+        axis square
+    end
+    subplot(2,3,6)
+    doColors = v2rgb(contextError);
+    scatter(clusteredContext.embedding(:,1), ...
+        clusteredContext.embedding(:,2),10,doColors,'filled');
+    axis equal
+    axis square
+    saveFig(gcf,[root '/Drift_UMAP_ParameterProjection'],[{'pdf'} {'tiff'}])
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    figure
+    set(gcf,'position',[50 50 1200 300])
+    mMAE = nanmean(conMAE,2);
+    driftXlag = mat2lag(across.simXseq);
+    rvals = nan(4,1);
+    pvals = nan(4,1);
+    for i = 1:4
+
+        isGood = ~isnan(driftXlag(:,i)) & ~isnan(mMAE);
+        if ~any(isGood)
+            continue
+        end
+
+        subplot(1,4,i)
+        scatter(log10(mMAE),atanh(driftXlag(:,i)),10,[0.9 0.6 0.2],'filled')
+        set(gca,'xlim',[-3 1],'ylim',[-1 3])
+        lsline
+        xlabel('Context fit error log_1_0(MAE)')
+        ylabel('Stability atanh(r)')
+        axis square
+        title(['Lag ' num2str(i)])
+        [rvals(i) pvals(i)] = corr(mMAE(isGood),driftXlag(isGood,i),'type','spearman');
+
+        textX = get(gca,'xlim');
+        textX = textX(2) - [textX(2)-textX(1)].*0.05;
+        textY = get(gca,'ylim');
+        textY = textY(2) - [textY(2)-textY(1)].*0.15;
+        text(textX,textY,sprintf(['rho = %.3f\np = %.2e\nn = %.0f'],[rvals(i) pvals(i) nansum(isGood)]), ...
+            'fontweight','normal','fontname','arial','fontsize',10,'horizontalalignment','right');
+    end
+    saveFig(gcf,[root 'ContextMAE_vs_DriftLag_All'],[{'pdf'} {'tiff'}])
+    
+    figure
+    set(gcf,'position',[50 50 1200 1500])
+    toPlot = repmat({[]},[1 4]);
+    for useSeq = 1:5
+    
+        mMAE = conMAE(:,useSeq);
+        
+        tmp = across.simXseq;
+        tmp(useSeq,:,:) = nan;
+        tmp(:,useSeq,:) = nan;
+        driftXlag = mat2lag(tmp);
+
+        rvals = nan(4,1);
+        pvals = nan(4,1);
+        for i = 1:4
+            
+            isGood = ~isnan(driftXlag(:,i)) & ~isnan(mMAE);
+            if ~any(isGood)
+                continue
+            end
+            
+            toPlot{i} = cat(1,toPlot{i},[mMAE(isGood) driftXlag(isGood,i)]);
+            
+            subplot(5,4,(useSeq-1).*4+i)
+            scatter(log10(mMAE),atanh(driftXlag(:,i)),10,[0.9 0.6 0.2],'filled')
+            set(gca,'xlim',[-3 1],'ylim',[-1 3])
+            lsline
+            xlabel('Context fit error log_1_0(MAE)')
+            ylabel('Stability atanh(r)')
+            axis square
+            title(['Lag ' num2str(i)])
+            [rvals(i) pvals(i)] = corr(mMAE(isGood),driftXlag(isGood,i),'type','spearman');
+            
+            textX = get(gca,'xlim');
+            textX = textX(2) - [textX(2)-textX(1)].*0.05;
+            textY = get(gca,'ylim');
+            textY = textY(2) - [textY(2)-textY(1)].*0.15;
+            text(textX,textY,sprintf(['rho = %.3f\np = %.2e\nn = %.0f'],[rvals(i) pvals(i) nansum(isGood)]), ...
+                'fontweight','normal','fontname','arial','fontsize',10,'horizontalalignment','right');
+        end
+    end
+    saveFig(gcf,[root 'ContextMAE_vs_DriftLag_LeaveEachOut'],[{'pdf'} {'tiff'}])
+    
+%     figure
+%     set(gcf,'position',[50 50 1200 300])
+%     mMAE = nanmean(conMAE,2);
+%     driftXlag = mat2lag(across.simXseq);
+%     rvals = nan(4,1);
+%     pvals = nan(4,1);
+%     for i = 1:4
+% 
+%         isGood = ~isnan(driftXlag(:,i)) & ~isnan(mMAE);
+%         if ~any(isGood)
+%             continue
+%         end
+% 
+%         subplot(1,4,i)
+%         scatter(log10(toPlot{i}(:,1)),atanh(toPlot{i}(:,2)),10,[0.9 0.6 0.2],'filled')
+%         set(gca,'xlim',[-3 1],'ylim',[-1 3])
+%         lsline
+%         xlabel('Context fit error log_1_0(MAE)')
+%         ylabel('Stability atanh(r)')
+%         axis square
+%         title(['Lag ' num2str(i)])
+%         [rvals(i) pvals(i)] = corr(toPlot{i}(:,1),toPlot{i}(:,2),'type','spearman');
+% 
+%         textX = get(gca,'xlim');
+%         textX = textX(2) - [textX(2)-textX(1)].*0.05;
+%         textY = get(gca,'ylim');
+%         textY = textY(2) - [textY(2)-textY(1)].*0.15;
+%         text(textX,textY,sprintf(['rho = %.3f\np = %.2e\nn = %.0f'],[rvals(i) pvals(i) nansum(isGood)]), ...
+%             'fontweight','normal','fontname','arial','fontsize',10,'horizontalalignment','right');
+%     end
+%     saveFig(gcf,[root 'ContextMAE_vs_DriftLag_LeaveEachOutAndCombine'],[{'pdf'} {'tiff'}])
+end

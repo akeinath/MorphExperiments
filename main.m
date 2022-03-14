@@ -1,3 +1,1 @@
-
-p = getFilePaths('MatlabData/MorphParadigm_CA1_FinalDataset','.mat');
-continuousMapAnalysis(p)
+BatchAnalyses_Upload(getFilePaths('FOLDER_CONTAINING_DATA','.mat'));

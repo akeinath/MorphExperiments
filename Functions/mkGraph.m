@@ -57,8 +57,8 @@ function h = mkGraph(d,xl,inColor,varargin)
         for j = 1:ticks
             
             if length(d{i,j})>=1
-                h(i,j) = plot(j-(w./2)+(wpg.*(i-1))+wpg./2+jitters{i,j},d{i,j},'linestyle','none','color',dotColor(i,:),...
-                    'marker','o','markersize',5);
+%                 h(i,j) = plot(j-(w./2)+(wpg.*(i-1))+wpg./2+jitters{i,j},d{i,j},'linestyle','none','color',dotColor(i,:),...
+%                     'marker','o','markersize',5);
                 if j < ticks && length(d{i,j}) == length(d{i,j+1}) && length(d(:,1)) == 1
                     plot([repmat([j j+1],[length(d{i,j}) 1])+[jitters{i,j} jitters{i,j+1}]]',[d{i,j} d{i,j+1}]', ...
                         'color',dotColor(i,:),'linewidth',0.8);

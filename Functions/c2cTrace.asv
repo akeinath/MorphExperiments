@@ -1,0 +1,28 @@
+function c2cTrace(uGT)
+
+    for si = 1:length(uGT)
+        t = uGT{si};
+        smth = 30;
+        kern = fspecial('gauss',[1 smth.*7],smth);
+        st = imfilter(t,kern,'same');
+        
+        goodCells = ~any(isnan(st),2);
+        
+        st(~goodCells,:) = [];
+        
+        pop = nanmean(st);
+        
+        c2c = nan(length(st(:,1)),length(st(:,1)));
+        for ki = 1:length(st(:,1))       
+            for kj = ki+1:length(st(:,1))
+                pop = nanmean(st([1:ki-1 ki+1:end],:));
+                beta = glmfit([st(ki,:); pop]',st(kj,:)');
+                c2c(ki,kj) = beta(2);
+                
+                ap = c2c(~isnan(c2c));
+                histogram(ap,[-0.2:0.25:0.5])
+            end
+        end
+    end
+
+end

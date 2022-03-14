@@ -1,4 +1,4 @@
-function continuousMapAnalysis(paths,doPlot)
+function continuousMapAnalysis(paths,forceReload)
     
     clc
     close all
@@ -6,11 +6,13 @@ function continuousMapAnalysis(paths,doPlot)
     
     doMDS = true;
     
-    pause_thresh = 2;
+    pause_thresh = -2;
     doAnatomy = false;
+    
+    doVecs = false;
     doCOM = false;
     if nargin < 2
-        doPlot = false;
+        forceReload = false;
     end
 
     warning off all
@@ -53,7 +55,7 @@ function continuousMapAnalysis(paths,doPlot)
     
     envSize = [17 17];
     includeLags = inf;
-    pThresh = 0.01; %0.025;
+    pThresh = 0.025; %0.025;
     tr2Thresh = 0.1915;
     
     envLabel = [{'sq1'} {'sq2'} {'sq3'} ...
@@ -66,139 +68,131 @@ function continuousMapAnalysis(paths,doPlot)
         fprintf(['\n\tMouse:  ' num2str(upiece{mi}(find(ismember(upiece{mi},'/'),1,'last')+1:end)) '\n'])
         isM = find(ismember(piece,upiece(mi)));
         sessions = paths(isM);
-        s = load(paths{isM(1)});
-        doAl = help_getAlignmentID(s.alignment,length(isM),paths(isM));
-        alignMap = s.alignment(doAl).alignmentMap;
-        am = repmat({[]},[1 length(sessions)]);
-        atm = repmat({[]},[1 length(sessions)]);
-        amfr = repmat({[]},[1 length(sessions)]);
-        isPC = repmat({[]},[1 length(sessions)]);
-        COMs = repmat({[]},[1 length(sessions)]);
-        SHCs = repmat({[]},[1 length(sessions)]);
-        SICs = repmat({[]},[1 length(sessions)]);
-        PFSs = repmat({[]},[1 length(sessions)]);
-        PFRs = repmat({[]},[1 length(sessions)]);
-        MFRs = repmat({[]},[1 length(sessions)]);
-        SNRs = repmat({[]},[1 length(sessions)]);
-        SFPs = s.alignment(doAl).regDetails.spatial_footprints_corrected;
-        simVecs = repmat({[]},[1 length(sessions)]);
-        envs = [];
-        tic
         
-        slashInds = find(ismember(paths{1},'/'));
-        root = ['Plots/Summary' paths{1}(slashInds(1):slashInds(2)-1)];
         slashInds = find(ismember(upiece{mi},'/'));
-        root = [root '/' upiece{mi}(slashInds(end)+1:end) '/ContinuousAnalyses'];
-        close all
-        drawnow;
-        fprintf(['\t\tPreloading Data... '])
-        for si = 1:length(sessions)
-            if doAnatomy
-                s = load(sessions{si},'processed','exclude');
-            else
-                s = load(sessions{si},'processed','exclude');
-            end
-            slashInds = find(ismember(sessions{si},'/'));
-            gT = s.processed.trace;
-            if isfield(s.processed,'exclude')
-                gT = gT(s.processed.exclude.SFPs,:);
-            end
-            amfr{si} = nanmean(gT,2);
-            v = [0 sqrt(nansum(diff(s.processed.p,[],2).^2,1))].*30;
-            [m os unm] = mkTraceMaps(s.processed.p,gT,v>=pause_thresh,envSize);
-            am{si} = m;
-            
-            %%%% compute spatial info
-            unm = reshape(unm,[numel(unm(:,:,1)) length(unm(1,1,:))]);
-            normS = os(:)./nansum(os(:));
-            normM = bsxfun(@rdivide,30.*unm,30.*nanmean(gT(:,v>=pause_thresh),2)');
-            SICs{si} = nansum(bsxfun(@times,normS,30.*unm.*log2(normM)),1)';
-            
-            m1 = mkTraceMaps(s.processed.p,gT,v>=pause_thresh & ...
-                1:length(s.processed.p)<length(s.processed.p)/2,envSize);
-            m2 = mkTraceMaps(s.processed.p,gT,v>=pause_thresh & ...
-                1:length(s.processed.p)>=length(s.processed.p)/2,envSize);
-            tSHC = xcorr3transform(m1,m2,[0 0 0]);
-            
-            isMin = 2.5.*floor([1:length(gT(1,:))]./(30.*60))+1;
-            [potato tomato time_un] = mkTraceMaps([isMin; ones(size(isMin))],gT,[1 20]);
-            time_un = permute(time_un,[3 1 2]);
-            time_un(:,end) = [];
-            atm{si} = time_un;
-%             atm{si} = imfilter(time_un,fspecial('gauss',[1 20],3),'same','replicate');
-            
-            tm = m./repmat(nanmax(nanmax(m,[],1),[],2),size(m(:,:,1)));
-%             PFSs{si} = permute(nansum(nansum(tm>0.25,1),2),[3 1 2]) ./ ...
-%                 nansum(nansum(~isnan(m(:,:,1))));
-            PFSs{si} = permute(nansum(nansum(tm>0.75,1),2),[3 1 2]);
-            PFRs{si} = permute(nanmax(nanmax(m,[],1),[],2),[3 1 2]).*30;
-%             SHCs{si} = tSHC; % s.processed.splithalf.wholemap_unmatched.val;
-            isPC{si} = s.processed.splithalf.wholemap_unmatched.p <= pThresh;
-            MFRs{si} = nanmean(gT(:,v>=pause_thresh),2);
-            if isfield(s.processed,'exclude')
-                isPC{si} = isPC{si}(s.processed.exclude.SFPs,:);
-                SHCs{si} = s.processed.splithalf.wholemap_unmatched.val(s.processed.exclude.SFPs,:);                
-                SNRs{si} = s.processed.snr.whole(s.processed.exclude.SFPs,:);
-            end
-            
-%             SHCs{si} = tSHC;
-            
-            envs = [envs; {lower(sessions{si}(find(ismember(sessions{si},'_'),1,'last')+1:end-4))}];
-%             if doAnatomy
-%                 MeanFrames{si} = s.calcium.meanFrame;
-%             end
+        top = ['MatlabData/AnalysisPreloads/' upiece{mi}(slashInds(1)+1:end)];
+        
+        if exist([top '.mat'],'file')~=2 || forceReload
+            s = load(paths{isM(1)});
+            doAl = help_getAlignmentID(s.alignment,length(isM),paths(isM));
+            alignMap = s.alignment(doAl).alignmentMap;
+            am = repmat({[]},[1 length(sessions)]);
+            atm = repmat({[]},[1 length(sessions)]);
+            amfr = repmat({[]},[1 length(sessions)]);
+            isPC = repmat({[]},[1 length(sessions)]);
+            COMs = repmat({[]},[1 length(sessions)]);
+            SHCs = repmat({[]},[1 length(sessions)]);
+            SICs = repmat({[]},[1 length(sessions)]);
+            PFSs = repmat({[]},[1 length(sessions)]);
+            PFRs = repmat({[]},[1 length(sessions)]);
+            MFRs = repmat({[]},[1 length(sessions)]);
+            SNRs = repmat({[]},[1 length(sessions)]);
+            SFPs = s.alignment(doAl).regDetails.spatial_footprints_corrected;
+            simVecs = repmat({[]},[1 length(sessions)]);
+            envs = [];
+            tic
 
+            slashInds = find(ismember(paths{1},'/'));
+            root = ['Plots/Summary' paths{1}(slashInds(1):slashInds(2)-1)];
+            slashInds = find(ismember(upiece{mi},'/'));
+            root = [root '/' upiece{mi}(slashInds(end)+1:end) '/ContinuousAnalyses'];
+            close all
+            drawnow;
+            fprintf(['\t\tPreloading Data... '])
+            for si = 1:length(sessions)
+                if doAnatomy
+                    s = load(sessions{si},'processed','exclude');
+                else
+                    s = load(sessions{si},'processed','exclude');
+                end
+                slashInds = find(ismember(sessions{si},'/'));
+                gT = s.processed.trace;
+                if isfield(s.processed,'exclude')
+                    gT = gT(s.processed.exclude.SFPs,:);
+                end
+                amfr{si} = nanmean(gT,2);
+                v = [0 sqrt(nansum(diff(s.processed.p,[],2).^2,1))].*30;
+                [m os unm] = mkTraceMaps(s.processed.p,gT,v>=pause_thresh,envSize);
+                am{si} = m;
+
+                %%%% compute spatial info
+                unm = reshape(unm,[numel(unm(:,:,1)) length(unm(1,1,:))]);
+                normS = os(:)./nansum(os(:));
+                normM = bsxfun(@rdivide,30.*unm,30.*nanmean(gT(:,v>=pause_thresh),2)');
+                SICs{si} = nansum(bsxfun(@times,normS,30.*unm.*log2(normM)),1)';
+
+                m1 = mkTraceMaps(s.processed.p,gT,v>=pause_thresh & ...
+                    1:length(s.processed.p)<length(s.processed.p)/2,envSize);
+                m2 = mkTraceMaps(s.processed.p,gT,v>=pause_thresh & ...
+                    1:length(s.processed.p)>=length(s.processed.p)/2,envSize);
+                tSHC = xcorr3transform(m1,m2,[0 0 0]);
+
+                isMin = 2.5.*floor([1:length(gT(1,:))]./(30.*60))+1;
+                [potato tomato time_un] = mkTraceMaps([isMin; ones(size(isMin))],gT,[1 20]);
+                time_un = permute(time_un,[3 1 2]);
+                time_un(:,end) = [];
+                atm{si} = time_un;
+    %             atm{si} = imfilter(time_un,fspecial('gauss',[1 20],3),'same','replicate');
+
+                tm = m./repmat(nanmax(nanmax(m,[],1),[],2),size(m(:,:,1)));
+    %             PFSs{si} = permute(nansum(nansum(tm>0.25,1),2),[3 1 2]) ./ ...
+    %                 nansum(nansum(~isnan(m(:,:,1))));
+                PFSs{si} = permute(nansum(nansum(tm>0.75,1),2),[3 1 2]);
+                PFRs{si} = permute(nanmax(nanmax(m,[],1),[],2),[3 1 2]).*30;
+    %             SHCs{si} = tSHC; % s.processed.splithalf.wholemap_unmatched.val;
+                isPC{si} = s.processed.splithalf.wholemap_unmatched.p <= pThresh;
+                MFRs{si} = nanmean(gT(:,v>=pause_thresh),2);
+                if isfield(s.processed,'exclude')
+                    isPC{si} = isPC{si}(s.processed.exclude.SFPs,:);
+                    SHCs{si} = s.processed.splithalf.wholemap_unmatched.val(s.processed.exclude.SFPs,:);                
+                    SNRs{si} = s.processed.snr.whole(s.processed.exclude.SFPs,:);
+                end
+
+                if doVecs
+                    simVecs{si} = corr(chunkVec(imfilter(gT,fspecial('gauss',[1 30],5),'same'),15)'>0);
+                end
+                envs = [envs; {lower(sessions{si}(find(ismember(sessions{si},'_'),1,'last')+1:end-4))}];
+            end  
             
-%             figure(1)
-%             set(gcf,'position',[50 50 1600 600])
-%             subplot(4,8,si)
-%             imagesc(s.processed.meanFrame);
-%             axis equal
-%             axis off
-%             colormap gray
-%             
-%             figure(2)
-%             set(gcf,'position',[50 50 1600 600])
-%             subplot(4,8,si)
-%             tmp = s.processed.SFPs(:,:,s.processed.exclude.SFPs);
-%             tmp = tmp./repmat(nanmax(nanmax(tmp,[],1),[],2),size(tmp(:,:,1)));
-%             imagesc(nanmax(tmp,[],3).^3);
-%             axis equal
-%             axis off
-        end  
-%         figure(1)
-%         saveFig(gcf,[root '/MeanFrames'],[{'pdf'} {'tiff'}])
-%         figure(2)
-%         saveFig(gcf,[root '/SFPs'],[{'pdf'} {'tiff'}])
-%         close all
-%         drawnow;
-%         durat = toc;
-%         fprintf([num2str(durat) ' s\n']);
-        
-        minVecTimes = nanmin(cellfun(@size,simVecs,repmat({2},size(simVecs))));
-        uvecSim = nan([length(alignMap{1}(:,1)) minVecTimes length(sessions)]);
-        umfr = nan([length(alignMap{1}(:,1)) length(sessions)]);
-        upfr = nan([length(alignMap{1}(:,1)) length(sessions)]);
-        upfs = nan([length(alignMap{1}(:,1)) length(sessions)]);
-        usic = nan([length(alignMap{1}(:,1)) length(sessions)]);
-        ushc = nan([length(alignMap{1}(:,1)) length(sessions)]);
-        
-        usnr = nan([length(alignMap{1}(:,1)) length(sessions)]);
-        uclass = nan([length(alignMap{1}(:,1)) length(sessions)]);
-        uIsPC = false([length(alignMap{1}(:,1)) length(sessions)]);
-        um = nan([envSize length(alignMap{1}(:,1)) length(sessions)]);
-        utm = nan([length(alignMap{1}(:,1)) 20 length(sessions)]);
-        
-        for si = 1:length(sessions)
-            umfr(alignMap{1}(:,si)~=0,si) = MFRs{si}(alignMap{1}(alignMap{1}(:,si)~=0,si));
-            upfr(alignMap{1}(:,si)~=0,si) = PFRs{si}(alignMap{1}(alignMap{1}(:,si)~=0,si));
-            upfs(alignMap{1}(:,si)~=0,si) = PFSs{si}(alignMap{1}(alignMap{1}(:,si)~=0,si));
-            usic(alignMap{1}(:,si)~=0,si) = SICs{si}(alignMap{1}(alignMap{1}(:,si)~=0,si));
-            ushc(alignMap{1}(:,si)~=0,si) = SHCs{si}(alignMap{1}(alignMap{1}(:,si)~=0,si));
-            uIsPC(alignMap{1}(:,si)~=0,si) = isPC{si}(alignMap{1}(alignMap{1}(:,si)~=0,si));
-            um(:,:,alignMap{1}(:,si)~=0,si) = am{si}(:,:,alignMap{1}(alignMap{1}(:,si)~=0,si));
-            usnr(alignMap{1}(:,si)~=0,si) = SNRs{si}(alignMap{1}(alignMap{1}(:,si)~=0,si));
-%             utm(alignMap{1}(:,si)~=0,:,si) = atm{si}(alignMap{1}(alignMap{1}(:,si)~=0,si),:);
+            minVecTimes = nanmin(cellfun(@size,simVecs,repmat({2},size(simVecs))));
+            uvecSim = nan([length(alignMap{1}(:,1)) minVecTimes length(sessions)]);
+            umfr = nan([length(alignMap{1}(:,1)) length(sessions)]);
+            upfr = nan([length(alignMap{1}(:,1)) length(sessions)]);
+            upfs = nan([length(alignMap{1}(:,1)) length(sessions)]);
+            usic = nan([length(alignMap{1}(:,1)) length(sessions)]);
+            ushc = nan([length(alignMap{1}(:,1)) length(sessions)]);
+
+            usnr = nan([length(alignMap{1}(:,1)) length(sessions)]);
+            uclass = nan([length(alignMap{1}(:,1)) length(sessions)]);
+            uIsPC = false([length(alignMap{1}(:,1)) length(sessions)]);
+            um = nan([envSize length(alignMap{1}(:,1)) length(sessions)]);
+            utm = nan([length(alignMap{1}(:,1)) 20 length(sessions)]);
+
+            ustcorrs = nan([length(alignMap{1}(:,1)) length(alignMap{1}(:,1)) length(sessions)]);
+
+            for si = 1:length(sessions)
+                umfr(alignMap{1}(:,si)~=0,si) = MFRs{si}(alignMap{1}(alignMap{1}(:,si)~=0,si));
+                upfr(alignMap{1}(:,si)~=0,si) = PFRs{si}(alignMap{1}(alignMap{1}(:,si)~=0,si));
+                upfs(alignMap{1}(:,si)~=0,si) = PFSs{si}(alignMap{1}(alignMap{1}(:,si)~=0,si));
+                usic(alignMap{1}(:,si)~=0,si) = SICs{si}(alignMap{1}(alignMap{1}(:,si)~=0,si));
+                ushc(alignMap{1}(:,si)~=0,si) = SHCs{si}(alignMap{1}(alignMap{1}(:,si)~=0,si));
+                uIsPC(alignMap{1}(:,si)~=0,si) = isPC{si}(alignMap{1}(alignMap{1}(:,si)~=0,si));
+                um(:,:,alignMap{1}(:,si)~=0,si) = am{si}(:,:,alignMap{1}(alignMap{1}(:,si)~=0,si));
+                usnr(alignMap{1}(:,si)~=0,si) = SNRs{si}(alignMap{1}(alignMap{1}(:,si)~=0,si));
+
+
+    %             utm(alignMap{1}(:,si)~=0,:,si) = atm{si}(alignMap{1}(alignMap{1}(:,si)~=0,si),:);
+
+                if doVecs
+                    ustcorrs(alignMap{1}(:,si)~=0,alignMap{1}(:,si)~=0,si) = simVecs{si}(alignMap{1}(alignMap{1}(:,si)~=0,si),...
+                        alignMap{1}(alignMap{1}(:,si)~=0,si));
+                end
+            end
+            
+            checkP(top);
+            save(top);
+        else
+            load(top);
         end
         
         isGood = ~isnan(umfr);
@@ -236,10 +230,10 @@ function continuousMapAnalysis(paths,doPlot)
             end
         end       
         
-%         ptm = permute(utm,[2 3 1]);
-%         for k = 1:length(ptm(1,1,:))
-%             time_sim(:,:,k) = corr(ptm(:,:,k));
-%         end
+        ptm = permute(utm,[2 3 1]);
+        for k = 1:length(ptm(1,1,:))
+            time_sim(:,:,k) = corr(ptm(:,:,k));
+        end
         
 %         %%%% shuffle rate maps
 %         Sum = um;
@@ -431,47 +425,101 @@ function continuousMapAnalysis(paths,doPlot)
         
         %%%%%%%%%%%% Cell to cell RSA
         
-% % %         cellSim = nan(length(sim(1,1,:)),length(sim(1,1,:)));
-% % %         transMats = atanh(reshape(sim,[numel(sim(:,:,1)) length(sim(1,1,:))]));
-% % %         for i = 1:length(sim(1,1,:))
-% % %             for j = i+1:length(sim(1,1,:))
-% % %                 isGood = (~isnan(transMats(:,i))&~isnan(transMats(:,j)));
-% % %                 if nansum(isGood) >= 28
-% % %                     cellSim(i,j) = corr(transMats(isGood,i),transMats(isGood,j));
-% % %                 end
-% % %             end
-% % %         end
-% % %         cellSim = squarify(cellSim);
-% % %         
-% % %         excludedCellSim = cellSim;
-% % %         excludedCellClasses = cellClass;
-% % %         while any(nansum(isnan(excludedCellSim))>1)
-% % %             [blah isBad] = nanmax(nansum(isnan(excludedCellSim)));
-% % %             excludedCellSim(isBad,:) = [];
-% % %             excludedCellSim(:,isBad) = [];
-% % %             excludedCellClasses(isBad) = [];
-% % % %             imagesc(excludedCellSim)
-% % % %             drawnow
-% % %         end
-% % %         tmp = excludedCellSim;
-% % %         tmp(logical(eye(size(tmp)))) = 1;
-% % %         tmp = 1-(tmp).*1;
-% % %     % 
-% % %         [mdssim] = mdscale(tmp,2);
-% % %         figure(1)
-% % %         set(gcf,'position',[50 50 350 350])
-% % %         set(gca,'xlim',[-1 1],'ylim',[-1 1])
-% % %         hold on
-% % %         colors = [0.5 0.5 0.5; 0.9 0.2 0.2; 0.2 0.2 0.9; 0.2 0.9 0.2];
-% % %         for ci = 1:4
-% % %             plot(mdssim(excludedCellClasses==(ci-1),1), ...
-% % %                 mdssim(excludedCellClasses==(ci-1),2),...
-% % %                 'linestyle','none',...
-% % %                 'marker','o','color',colors(ci,:),'markerfacecolor',colors(ci,:),...
-% % %                 'markersize',5)            
-% % %         end
-% % %         saveFig(gcf,[root '/Classification/Cell_To_Cell_MDS'],[{'pdf'} {'tiff'}]);
+        cellSim = nan(length(sim(1,1,:)),length(sim(1,1,:)));
+        transMats = atanh(reshape(sim,[numel(sim(:,:,1)) length(sim(1,1,:))]));
+        for i = 1:length(sim(1,1,:))
+            for j = i+1:length(sim(1,1,:))
+                isGood = (~isnan(transMats(:,i))&~isnan(transMats(:,j)));
+                if nansum(isGood) >= 28
+                    cellSim(i,j) = corr(transMats(isGood,i),transMats(isGood,j));
+                end
+            end
+        end
+        cellSim = squarify(cellSim);
         
+        excludedCellSim = cellSim;
+        excludedCellClasses = cellClass;
+        while any(nansum(isnan(excludedCellSim))>1)
+            [blah isBad] = nanmax(nansum(isnan(excludedCellSim)));
+            excludedCellSim(isBad,:) = [];
+            excludedCellSim(:,isBad) = [];
+            excludedCellClasses(isBad) = [];
+%             imagesc(excludedCellSim)
+%             drawnow
+        end
+        tmp = excludedCellSim;
+        tmp(logical(eye(size(tmp)))) = 1;
+        tmp = 1-(tmp).*1;
+        
+        
+        [mdssim ev] = cmdscale(tmp);
+        close all
+        drawnow
+        tsne(mdssim,excludedCellClasses+1,2,[],30);
+        saveFig(gcf,[root '/Classification/Cell_To_Cell_MDS_tsne'],[{'pdf'} {'tiff'}]);
+        
+    % 
+%         for ci = 1:4
+%             close all
+%             drawnow
+%             [mdssim] = mdscale(tmp(excludedCellClasses==(ci-1),excludedCellClasses==(ci-1)),3);
+%             figure(1)
+%             set(gcf,'position',[50 50 350 350])
+%             set(gca,'xlim',[-1 1],'ylim',[-1 1])
+%             hold on
+%             colors = [0.5 0.5 0.5; 0.9 0.2 0.2; 0.2 0.2 0.9; 0.2 0.9 0.2];
+% 
+%             plot3(mdssim(:,1), ...
+%                 mdssim(:,2),...
+%                 mdssim(:,3),...
+%                 'linestyle','none',...
+%                 'marker','o','color',colors(ci,:),'markerfacecolor',colors(ci,:),...
+%                 'markersize',5)
+%             
+%             zlabel('MDS Dim 3');
+%             ylabel('MDS Dim 2');
+%             xlabel('MDS Dim 1');
+%             grid on
+%             clear frames
+%             for i = 1:1:360
+%                 view(i+0.5,20)
+%                 drawnow
+%                 frames(i) = getframe(gcf);
+% 
+%                 im = frame2im(frames(i)); 
+%                 [imind,cm] = rgb2ind(im,256); 
+%                 if i == 1
+%                     checkP([root '/Classification/Cell_To_Cell_MDS_Group_' num2str(ci)]);
+%                     imwrite(imind,cm,[root '/Classification/Cell_To_Cell_MDS_Group_' num2str(ci)], ...
+%                         'gif', 'Loopcount',inf,'DelayTime',0.025); 
+%                 else
+%                     imwrite(imind,cm,[root '/Classification/Cell_To_Cell_MDS_Group_' num2str(ci)], ...
+%                         'gif','DelayTime',0.025,'WriteMode','append'); 
+%                 end
+%             end
+%         end
+
+
+        
+        
+        close all
+        figure()
+        c2c_stcorr = nan(3,3,32);
+        if doVecs
+            for i = 1:3
+                for j = i
+                    goodPair = (bsxfun(@and,cellClass==i,cellClass'==j) | ...
+                        bsxfun(@and,cellClass==j,cellClass'==i));
+                    goodPair(1:length(goodPair)+1:end) = false;
+                    
+                    pairsXSession = reshape(ustcorrs(repmat(goodPair,[1 1 length(sessions)])), ...
+                        [nansum(goodPair(:)) length(sessions)]);
+%                     c2c_stcorr(i,j) = nanmean(pairsXSession,2);
+                    plot(nanmean(pairsXSession,1))
+                    hold on
+                end
+            end
+        end
         %%%%% Fit decay of time-loading cells
         for i = 1:3
 

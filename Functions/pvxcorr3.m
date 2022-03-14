@@ -40,6 +40,7 @@ function am = pvxcorr3(m1,m2,lims,minSamples)
     maxLims = [(size(m2(:,:,1))-1) 180];
     lims(lims>maxLims)=maxLims(lims>maxLims);
     for rot = -lims(3):lims(3)
+        roti = rot==-lims(3):lims(3);
         rm2 = imrotate(m2,rot,'nearest','crop');
         for xlag = ceil(length(am(:,1,1))./2)-(lims(1)):ceil(length(am(:,1,1))./2)+(lims(1))
             xa = [max(length(m1(:,1,1))-xlag+1,1):...
@@ -65,7 +66,7 @@ function am = pvxcorr3(m1,m2,lims,minSamples)
                 if length(vals(:,1)) < minSamples
                     continue
                 end
-                am(xlag,ylag,rot==-lims(3):lims(3)) = corr(vals(:,1),vals(:,2));
+                am(xlag,ylag,roti) = corr(vals(:,1),vals(:,2));
             end
         end
     end
